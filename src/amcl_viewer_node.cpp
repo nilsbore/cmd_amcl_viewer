@@ -1,6 +1,5 @@
 #include <ros/ros.h>
 #include <opencv2/opencv.hpp>
-#include <opencv2/highgui.hpp>
 #include <nav_msgs/OccupancyGrid.h>
 #include <sys/ioctl.h>
 #include <costmap_2d/costmap_2d_ros.h>
