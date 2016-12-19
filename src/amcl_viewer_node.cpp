@@ -55,7 +55,7 @@
 #define BOLD(x) "\x1B[1m" x RST
 #define UNDL(x) "\x1B[4m" x RST
 
-#define WITH_NAV_GOAL 0
+#define WITH_NAV_GOAL 1
 
 using namespace std;
 
@@ -312,7 +312,7 @@ public:
                 if (pose && c_flip == subsampled_pose_x && r == subsampled_pose_y) {
                     cout << pointer_signs[subsampled_direction];
                 }
-                if (!last_goal.empty() && c_flip == goal_x && r == goal_y) {
+                else if (!last_goal.empty() && c_flip == goal_x && r == goal_y) {
                     cout << BOLD(FRED(BWHT("*")));
                 }
                 else if (subsampled_map.at<uchar>(r, c_flip) == 1) {
