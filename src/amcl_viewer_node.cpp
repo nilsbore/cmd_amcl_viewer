@@ -13,6 +13,7 @@
 #if WITH_WAYPOINTS
 #include <strands_navigation_msgs/TopologicalMap.h>
 #include <strands_navigation_msgs/TopologicalRoute.h>
+#include <strands_executive_msgs/TaskEvent.h>
 #endif
 
 /* FOREGROUND */
@@ -66,6 +67,7 @@ public:
     ros::Subscriber pose_sub;
 #if WITH_WAYPOINTS
     ros::Subscriber route_sub;
+    ros::Subscriber exec_sub;
 #endif
 
 #if WITH_NAV_GOAL
@@ -92,6 +94,7 @@ public:
     string last_goal;
     int goal_x;
     int goal_y;
+    string goal_action;
 
     MapViewerNode()
     {
@@ -107,7 +110,7 @@ public:
         pn.param<std::string>("map", map_input, std::string("/map"));
         char_scale = 1.8;
 
-        pose_sub = n.subscribe(pose_input, 1, &MapViewerNode::pose_callback, this);
+        //pose_sub = n.subscribe(pose_input, 1, &MapViewerNode::pose_callback, this);
 
         nav_msgs::OccupancyGrid::ConstPtr global_costmap_msg = ros::topic::waitForMessage<nav_msgs::OccupancyGrid>(map_input, n, ros::Duration(5));
         if (!global_costmap_msg) {
@@ -116,7 +119,8 @@ public:
         }
 
 #if WITH_WAYPOINTS
-        route_sub = n.subscribe("/topological_navigation/Route", 1, &MapViewerNode::route_callback, this);
+        //route_sub = n.subscribe("/topological_navigation/Route", 1, &MapViewerNode::route_callback, this);
+        exec_sub = n.subscribe("/task_executor/events", 1, &MapViewerNode::exec_callback, this);
         strands_navigation_msgs::TopologicalMapConstPtr topo_map_msg = ros::topic::waitForMessage<strands_navigation_msgs::TopologicalMap>("/topological_map", n, ros::Duration(5));
         if (!topo_map_msg) {
             ROS_ERROR("Could not get topological map, exiting...");
@@ -141,6 +145,15 @@ public:
     void route_callback(const strands_navigation_msgs::TopologicalRouteConstPtr& route_msg)
     {
         last_goal = route_msg->nodes.back();
+    }
+
+    void exec_callback(const strands_executive_msgs::TaskEvent::ConstPtr& exec_msg)
+    {
+        if (exec_msg->event == strands_executive_msgs::TaskEvent::EXECUTION_STARTED) {
+            last_goal = exec_msg->task.start_node_id;
+            goal_action = exec_msg->task.action;
+        }
+        //else if (exec_msg->event == strands_executive_msgs::TaskEvent::EXECUTION_FAILED)
     }
 
     void save_waypoints(strands_navigation_msgs::TopologicalMapConstPtr& topo_map_msg)
@@ -306,8 +319,13 @@ public:
         vector<string> pointer_signs = { BOLD(FRED(BWHT("<"))), BOLD(FRED(BWHT("v"))), BOLD(FRED(BWHT(">"))), BOLD(FRED(BWHT("^")))};
 
         cout << endl;
+        int start_pos = 0;
+        if (!last_goal.empty() && !goal_action.empty() && last_goal.size() + goal_action.size() + 2 < subsampled_width) {
+            cout << KBLU << KKWHT << last_goal << ": " << goal_action << RST << RST;
+            start_pos += last_goal.size() + goal_action.size() + 2;
+        }
         for (int r = 0; r < subsampled_height; ++r) {
-            for (int c = 0; c < subsampled_width; ++c) {
+            for (int c = r == 0 ? start_pos : 0; c < subsampled_width; ++c) {
                 int c_flip = subsampled_width-c-1;
                 if (pose && c_flip == subsampled_pose_x && r == subsampled_pose_y) {
                     cout << pointer_signs[subsampled_direction];
