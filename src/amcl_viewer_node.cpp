@@ -218,10 +218,9 @@ public:
         for (const pair<string, geometry_msgs::Pose>& wp : waypoints) {
             int pose_x, pose_y, direction;
             tie(pose_x, pose_y, direction) = pose_to_discrete_pose(wp.second);
-            int flip_pose_x = subsampled_width - pose_x - 1;
-            subsampled_map.at<char>(pose_y, flip_pose_x) = 'x';
-            for (int x = flip_pose_x - 1; x >= 0; --x) {
-                subsampled_map.at<char>(pose_y, x) = wp.first[flip_pose_x - x + 1];
+            subsampled_map.at<char>(pose_y, pose_x) = 'x';
+            for (int x = pose_x - 1; x >= 0; --x) {
+                subsampled_map.at<char>(pose_y, x) = wp.first[pose_x - x + 1];
             }
         }
 
