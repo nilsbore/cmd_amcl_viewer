@@ -6,7 +6,7 @@ add_definitions(-std=c++11)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS roscpp cv_bridge sensor_msgs geometry_msgs costmap_2d)
+find_package(catkin REQUIRED COMPONENTS roscpp cv_bridge sensor_msgs geometry_msgs costmap_2d strands_navigation_msgs)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)

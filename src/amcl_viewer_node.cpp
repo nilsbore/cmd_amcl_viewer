@@ -5,6 +5,12 @@
 #include <costmap_2d/costmap_2d_ros.h>
 #include <tf/transform_datatypes.h>
 
+#define WITH_WAYPOINTS 1
+
+#if WITH_WAYPOINTS
+#include <strands_navigation_msgs/TopologicalMap.h>
+#endif
+
 /* FOREGROUND */
 #define RST  "\x1B[0m"
 #define KRED  "\x1B[31m"
@@ -74,6 +80,8 @@ public:
 
     double char_scale;
 
+    vector<pair<string, geometry_msgs::Pose> > waypoints;
+
     MapViewerNode()
     {
         ros::NodeHandle n;
@@ -96,6 +104,15 @@ public:
             exit(0);
         }
 
+#if WITH_WAYPOINTS
+        strands_navigation_msgs::TopologicalMapConstPtr topo_map_msg = ros::topic::waitForMessage<strands_navigation_msgs::TopologicalMap>("/topological_map", n, ros::Duration(5));
+        if (!topo_map_msg) {
+            ROS_ERROR("Could not get topological map, exiting...");
+            exit(0);
+        }
+        save_waypoints(topo_map_msg);
+#endif
+
         save_map(global_costmap_msg);
     }
 
@@ -107,6 +124,15 @@ public:
     {
         pose = pose_msg;
     }
+
+#if WITH_WAYPOINTS
+    void save_waypoints(strands_navigation_msgs::TopologicalMapConstPtr& topo_map_msg)
+    {
+        for (const strands_navigation_msgs::TopologicalNode& node : topo_map_msg->nodes) {
+            waypoints.push_back(make_pair(node.name, node.pose));
+        }
+    }
+#endif
 
     void save_map(nav_msgs::OccupancyGrid::ConstPtr& map)
     {
@@ -178,6 +204,27 @@ public:
         cv::Size size(subsampled_width, subsampled_height);//the dst image size,e.g.100x100
         cv::resize(full_map, subsampled_map, size);//resize image
 
+        for (int r = 0; r < subsampled_height; ++r) {
+            for (int c = 0; c < subsampled_width; ++c) {
+                if (subsampled_map.at<uchar>(r, c) > 254) {
+                    subsampled_map.at<uchar>(r, c) = 1; // occupied
+                }
+                else {
+                    subsampled_map.at<uchar>(r, c) = 0; // not occupied
+                }
+            }
+        }
+
+        for (const pair<string, geometry_msgs::Pose>& wp : waypoints) {
+            int pose_x, pose_y, direction;
+            tie(pose_x, pose_y, direction) = pose_to_discrete_pose(wp.second);
+            int flip_pose_x = subsampled_width - pose_x - 1;
+            subsampled_map.at<char>(pose_y, flip_pose_x) = 'x';
+            for (int x = pose_x + 1; x < subsampled_width; ++x) {
+                subsampled_map.at<char>(pose_y, x) = wp.first[x-pose_x-1];
+            }
+        }
+
         return true;
     }
 
@@ -221,11 +268,14 @@ public:
                 if (pose && c_flip == subsampled_pose_x && r == subsampled_pose_y) {
                     cout << pointer_signs[subsampled_direction];
                 }
-                else if (subsampled_map.at<uchar>(r, c_flip) > 254) {
+                else if (subsampled_map.at<uchar>(r, c_flip) == 1) {
                     cout << BOLD(FBLU(BWHT("\u25A0")));
                 }
-                else {
+                else if (subsampled_map.at<uchar>(r, c_flip) == 0) {
                     cout << BWHT(" ");
+                }
+                else {
+                    cout << subsampled_map.at<char>(r, c_flip);
                 }
             }
             cout << '\n';
