@@ -12,6 +12,7 @@
 
 #if WITH_WAYPOINTS
 #include <strands_navigation_msgs/TopologicalMap.h>
+#include <strands_navigation_msgs/TopologicalRoute.h>
 #endif
 
 /* FOREGROUND */
@@ -63,6 +64,9 @@ class MapViewerNode {
 public:
 
     ros::Subscriber pose_sub;
+#if WITH_WAYPOINTS
+    ros::Subscriber route_sub;
+#endif
 
 #if WITH_NAV_GOAL
     geometry_msgs::PoseStampedConstPtr pose;
@@ -84,6 +88,10 @@ public:
     double char_scale;
 
     vector<pair<string, geometry_msgs::Pose> > waypoints;
+    vector<pair<string, geometry_msgs::Pose> > waypoints_short;
+    string last_goal;
+    int goal_x;
+    int goal_y;
 
     MapViewerNode()
     {
@@ -108,6 +116,7 @@ public:
         }
 
 #if WITH_WAYPOINTS
+        route_sub = n.subscribe("/topological_navigation/Route", 1, &MapViewerNode::route_callback, this);
         strands_navigation_msgs::TopologicalMapConstPtr topo_map_msg = ros::topic::waitForMessage<strands_navigation_msgs::TopologicalMap>("/topological_map", n, ros::Duration(5));
         if (!topo_map_msg) {
             ROS_ERROR("Could not get topological map, exiting...");
@@ -129,6 +138,11 @@ public:
     }
 
 #if WITH_WAYPOINTS
+    void route_callback(const strands_navigation_msgs::TopologicalRouteConstPtr& route_msg)
+    {
+        last_goal = route_msg->nodes.back();
+    }
+
     void save_waypoints(strands_navigation_msgs::TopologicalMapConstPtr& topo_map_msg)
     {
         for (const strands_navigation_msgs::TopologicalNode& node : topo_map_msg->nodes) {
@@ -136,7 +150,8 @@ public:
             name.erase(std::remove_if(name.begin(), name.end(), [](char c){
                 return std::islower(c);
             }), name.end());
-            waypoints.push_back(make_pair(name, node.pose));
+            waypoints_short.push_back(make_pair(name, node.pose));
+            waypoints.push_back(make_pair(node.name, node.pose));
         }
     }
 #endif
@@ -222,7 +237,7 @@ public:
             }
         }
 
-        for (const pair<string, geometry_msgs::Pose>& wp : waypoints) {
+        for (const pair<string, geometry_msgs::Pose>& wp : waypoints_short) {
             int pose_x, pose_y, direction;
             tie(pose_x, pose_y, direction) = pose_to_discrete_pose(wp.second);
             subsampled_map.at<char>(pose_y, pose_x) = '*';
@@ -256,12 +271,35 @@ public:
                 old_subsampled_pose_y != subsampled_pose_y);
     }
 
+    bool subsample_goal()
+    {
+        if (last_goal.empty() || waypoints.empty()) {
+            return false;
+        }
+
+        auto iter = std::find_if(waypoints.begin(), waypoints.end(), [&](const pair<string, geometry_msgs::Pose>& wp) {
+            return wp.first == last_goal;
+        });
+
+        if (iter == waypoints.end()) {
+            return false;
+        }
+
+        int direction;
+        int old_goal_x = goal_x;
+        int old_goal_y = goal_y;
+        tie(goal_x, goal_y, direction) = pose_to_discrete_pose(iter->second);
+        return (old_goal_x != goal_x ||
+                old_goal_y != goal_y);
+    }
+
     void draw()
     {
         bool did_update = maybe_subsample_map();
         bool did_move = subsample_pose();
+        bool did_update_goal = subsample_goal();
 
-        if (!did_update && !did_move) {
+        if (!did_update && !did_move && !did_update_goal) {
             return;
         }
 
@@ -273,6 +311,9 @@ public:
                 int c_flip = subsampled_width-c-1;
                 if (pose && c_flip == subsampled_pose_x && r == subsampled_pose_y) {
                     cout << pointer_signs[subsampled_direction];
+                }
+                if (!last_goal.empty() && c_flip == goal_x && r == goal_y) {
+                    cout << BOLD(FRED(BWHT("*")));
                 }
                 else if (subsampled_map.at<uchar>(r, c_flip) == 1) {
                     cout << BOLD(FBLU(BWHT("\u25A0")));
