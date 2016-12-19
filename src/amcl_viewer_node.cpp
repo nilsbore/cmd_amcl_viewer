@@ -4,6 +4,9 @@
 #include <sys/ioctl.h>
 #include <costmap_2d/costmap_2d_ros.h>
 #include <tf/transform_datatypes.h>
+//#include <algorithm>
+#include <cctype>
+#include <clocale>
 
 #define WITH_WAYPOINTS 1
 
@@ -129,7 +132,11 @@ public:
     void save_waypoints(strands_navigation_msgs::TopologicalMapConstPtr& topo_map_msg)
     {
         for (const strands_navigation_msgs::TopologicalNode& node : topo_map_msg->nodes) {
-            waypoints.push_back(make_pair(node.name, node.pose));
+            string name = node.name;
+            name.erase(std::remove_if(name.begin(), name.end(), [](char c){
+                return std::islower(c);
+            }), name.end());
+            waypoints.push_back(make_pair(name, node.pose));
         }
     }
 #endif
@@ -218,9 +225,9 @@ public:
         for (const pair<string, geometry_msgs::Pose>& wp : waypoints) {
             int pose_x, pose_y, direction;
             tie(pose_x, pose_y, direction) = pose_to_discrete_pose(wp.second);
-            subsampled_map.at<char>(pose_y, pose_x) = 'x';
-            for (int x = pose_x - 1; x >= 0; --x) {
-                subsampled_map.at<char>(pose_y, x) = wp.first[pose_x - x + 1];
+            subsampled_map.at<char>(pose_y, pose_x) = '*';
+            for (int x = pose_x - 1; x >= 0 && pose_x - x - 1 < wp.first.size(); --x) {
+                subsampled_map.at<char>(pose_y, x) = wp.first[pose_x - x - 1];
             }
         }
 
@@ -274,7 +281,7 @@ public:
                     cout << BWHT(" ");
                 }
                 else {
-                    cout << subsampled_map.at<char>(r, c_flip);
+                    cout << KBLU << KKWHT << subsampled_map.at<char>(r, c_flip) << RST << RST;
                 }
             }
             cout << '\n';
