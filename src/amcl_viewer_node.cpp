@@ -110,7 +110,7 @@ public:
         pn.param<std::string>("map", map_input, std::string("/map"));
         char_scale = 1.8;
 
-        //pose_sub = n.subscribe(pose_input, 1, &MapViewerNode::pose_callback, this);
+        pose_sub = n.subscribe(pose_input, 1, &MapViewerNode::pose_callback, this);
 
         nav_msgs::OccupancyGrid::ConstPtr global_costmap_msg = ros::topic::waitForMessage<nav_msgs::OccupancyGrid>(map_input, n, ros::Duration(5));
         if (!global_costmap_msg) {
