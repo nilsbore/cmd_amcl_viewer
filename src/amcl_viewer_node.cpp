@@ -8,12 +8,17 @@
 #include <cctype>
 #include <clocale>
 
-#define WITH_WAYPOINTS 1
+#define WITH_WAYPOINTS 0
+#define WITH_NCURSES 1
 
 #if WITH_WAYPOINTS
 #include <strands_navigation_msgs/TopologicalMap.h>
 #include <strands_navigation_msgs/TopologicalRoute.h>
 #include <strands_executive_msgs/TaskEvent.h>
+#endif
+
+#if WITH_NCURSES
+#include <ncurses.h>
 #endif
 
 /* FOREGROUND */
@@ -130,6 +135,17 @@ public:
 #endif
 
         save_map(global_costmap_msg);
+
+#if WITH_NCURSES
+        //initscr();
+#endif
+    }
+
+    virtual ~MapViewerNode()
+    {
+#if WITH_NCURSES
+        endwin();
+#endif
     }
 
 #if WITH_NAV_GOAL
@@ -218,7 +234,13 @@ public:
     bool maybe_subsample_map()
     {
         struct winsize w;
+#if WITH_NCURSES
+        initscr();
+        getmaxyx(stdscr, w.ws_row, w.ws_col);
+        //endwin();
+#else
         ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+#endif
         if (w.ws_col == last_w.ws_col && w.ws_row == last_w.ws_row) {
             return false;
         }
@@ -347,6 +369,58 @@ public:
         }
 
     }
+
+#if WITH_NCURSES
+    void draw_ncurses()
+    {
+        bool did_update = maybe_subsample_map();
+        bool did_move = subsample_pose();
+        bool did_update_goal = subsample_goal();
+
+        if (!did_update && !did_move && !did_update_goal) {
+            return;
+        }
+
+        //vector<string> pointer_signs = { BOLD(FRED(BWHT("<"))), BOLD(FRED(BWHT("v"))), BOLD(FRED(BWHT(">"))), BOLD(FRED(BWHT("^")))};
+        vector<string> pointer_signs = { BOLD(FRED(BWHT("<"))), BOLD(FRED(BWHT("v"))), BOLD(FRED(BWHT(">"))), BOLD(FRED(BWHT("^")))};
+
+        cout << endl;
+        int start_pos = 0;
+        if (!last_goal.empty() && !goal_action.empty() && last_goal.size() + goal_action.size() + 2 < subsampled_width) {
+            cout << KBLU << KKWHT << last_goal << ": " << goal_action << RST << RST;
+            start_pos += last_goal.size() + goal_action.size() + 2;
+        }
+        for (int r = 0; r < subsampled_height; ++r) {
+            for (int c = r == 0 ? start_pos : 0; c < subsampled_width; ++c) {
+                int c_flip = subsampled_width-c-1;
+                move(r, c);
+                if (pose && c_flip == subsampled_pose_x && r == subsampled_pose_y) {
+                    //cout << pointer_signs[subsampled_direction];
+                    printw(pointer_signs[subsampled_direction].c_str());
+                }
+                else if (!last_goal.empty() && c_flip == goal_x && r == goal_y) {
+                    //printw(BOLD(FRED(BWHT("*"))));
+                    printw("*");
+                }
+                else if (subsampled_map.at<uchar>(r, c_flip) == 1) {
+                    //printw(BOLD(FBLU(BWHT("\u25A0"))));
+                    printw("\u25A0");
+                }
+                else if (subsampled_map.at<uchar>(r, c_flip) == 0) {
+                    //printw(BWHT(" "));
+                    printw(" ");
+                }
+                else {
+                    cout << KBLU << KKWHT << subsampled_map.at<char>(r, c_flip) << RST << RST;
+                }
+            }
+            cout << '\n';
+        }
+
+        getch();
+
+    }
+#endif
 
     void run()
     {

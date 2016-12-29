@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS roscpp cv_bridge sensor_msgs geometry_ms
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
+find_package(Curses REQUIRED)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -110,7 +111,7 @@ catkin_package(
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
-include_directories(${catkin_INCLUDE_DIRS})
+include_directories(${catkin_INCLUDE_DIRS} ${CURSES_INCLUDE_DIR})
 
 ## Declare a C++ library
 # add_library(cmd_amcl_viewer
@@ -132,6 +133,7 @@ add_executable(amcl_viewer_node src/amcl_viewer_node.cpp)
 ## Specify libraries to link a library or executable target against
 target_link_libraries(amcl_viewer_node
   ${catkin_LIBRARIES}
+  ${CURSES_LIBRARIES}
 )
 
 #############
