@@ -8,7 +8,7 @@
 #include <cctype>
 #include <clocale>
 
-#define WITH_WAYPOINTS 0
+#define WITH_WAYPOINTS 1
 #define WITH_NCURSES 1
 
 #if WITH_WAYPOINTS
@@ -128,10 +128,11 @@ public:
         exec_sub = n.subscribe("/task_executor/events", 1, &MapViewerNode::exec_callback, this);
         strands_navigation_msgs::TopologicalMapConstPtr topo_map_msg = ros::topic::waitForMessage<strands_navigation_msgs::TopologicalMap>("/topological_map", n, ros::Duration(5));
         if (!topo_map_msg) {
-            ROS_ERROR("Could not get topological map, exiting...");
-            exit(0);
+            ROS_ERROR("Could not get topological map, skipping...");
         }
-        save_waypoints(topo_map_msg);
+        else {
+            save_waypoints(topo_map_msg);
+        }
 #endif
 
         save_map(global_costmap_msg);
@@ -256,7 +257,11 @@ public:
             subsampled_height = int(double(full_height)*double(subsampled_width)/double(full_width));
         }
         else {
+#if WITH_NCURSES
+            subsampled_height = rows;
+#else
             subsampled_height = rows - 1;
+#endif
             subsampled_width = int(double(full_width)*double(subsampled_height)/double(full_height));
         }
 
@@ -384,9 +389,15 @@ public:
         }
 
         clear();
+        start_color();
+        init_pair(1, COLOR_BLUE, COLOR_WHITE); // pointer foreground / background
+        init_pair(2, COLOR_RED, COLOR_WHITE); // goal foreground / background
+        init_pair(3, COLOR_CYAN, COLOR_CYAN); // occupied foreground / background
+        init_pair(4, COLOR_WHITE, COLOR_WHITE); // free foreground / background
+        init_pair(5, COLOR_BLUE, COLOR_WHITE); // waypoint foreground / background
 
         //vector<string> pointer_signs = { BOLD(FRED(BWHT("<"))), BOLD(FRED(BWHT("v"))), BOLD(FRED(BWHT(">"))), BOLD(FRED(BWHT("^")))};
-        vector<string> pointer_signs = { BOLD(FRED(BWHT("<"))), BOLD(FRED(BWHT("v"))), BOLD(FRED(BWHT(">"))), BOLD(FRED(BWHT("^")))};
+        vector<string> pointer_signs = { "<", "v", ">", "^"};
 
         cout << endl;
         int start_pos = 0;
@@ -400,22 +411,32 @@ public:
                 move(r, c);
                 if (pose && c_flip == subsampled_pose_x && r == subsampled_pose_y) {
                     //cout << pointer_signs[subsampled_direction];
+                    attron(COLOR_PAIR(1));
                     printw(pointer_signs[subsampled_direction].c_str());
+                    attroff(COLOR_PAIR(1));
                 }
                 else if (!last_goal.empty() && c_flip == goal_x && r == goal_y) {
                     //printw(BOLD(FRED(BWHT("*"))));
+                    attron(COLOR_PAIR(2));
                     printw("*");
+                    attroff(COLOR_PAIR(2));
                 }
                 else if (subsampled_map.at<uchar>(r, c_flip) == 1) {
                     //printw(BOLD(FBLU(BWHT("\u25A0"))));
+                    attron(COLOR_PAIR(3));
                     printw("F");
+                    attroff(COLOR_PAIR(3));
                 }
                 else if (subsampled_map.at<uchar>(r, c_flip) == 0) {
                     //printw(BWHT(" "));
+                    attron(COLOR_PAIR(4));
                     printw(" ");
+                    attroff(COLOR_PAIR(4));
                 }
                 else {
+                    attron(COLOR_PAIR(5));
                     addch(subsampled_map.at<char>(r, c_flip));
+                    attroff(COLOR_PAIR(5));
                     //cout << KBLU << KKWHT << subsampled_map.at<char>(r, c_flip) << RST << RST;
                 }
             }
