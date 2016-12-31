@@ -395,6 +395,7 @@ public:
         init_pair(3, COLOR_CYAN, COLOR_CYAN); // occupied foreground / background
         init_pair(4, COLOR_WHITE, COLOR_WHITE); // free foreground / background
         init_pair(5, COLOR_BLUE, COLOR_WHITE); // waypoint foreground / background
+        init_pair(6, COLOR_WHITE, COLOR_CYAN); // header foreground / background
 
         //vector<string> pointer_signs = { BOLD(FRED(BWHT("<"))), BOLD(FRED(BWHT("v"))), BOLD(FRED(BWHT(">"))), BOLD(FRED(BWHT("^")))};
         vector<string> pointer_signs = { "<", "v", ">", "^"};
@@ -402,8 +403,13 @@ public:
         cout << endl;
         int start_pos = 0;
         if (!last_goal.empty() && !goal_action.empty() && last_goal.size() + goal_action.size() + 2 < subsampled_width) {
-            cout << KBLU << KKWHT << last_goal << ": " << goal_action << RST << RST;
-            start_pos += last_goal.size() + goal_action.size() + 2;
+            //cout << KBLU << KKWHT << last_goal << ": " << goal_action << RST << RST;
+            move(0, 0);
+            string goal_header = last_goal + ": " + goal_action;
+            attron(COLOR_PAIR(6));
+            printw(goal_header.c_str());
+            attroff(COLOR_PAIR(6));
+            start_pos += goal_header.size();
         }
         for (int r = 0; r < subsampled_height; ++r) {
             for (int c = r == 0 ? start_pos : 0; c < subsampled_width; ++c) {
