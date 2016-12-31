@@ -358,7 +358,7 @@ public:
                     cout << BOLD(FRED(BWHT("*")));
                 }
                 else if (subsampled_map.at<uchar>(r, c_flip) == 1) {
-                    cout << BOLD(FBLU(BWHT("\u25A0")));
+                    cout << BOLD(FBLU(BWHT("F")));
                 }
                 else if (subsampled_map.at<uchar>(r, c_flip) == 0) {
                     cout << BWHT(" ");
@@ -408,7 +408,7 @@ public:
                 }
                 else if (subsampled_map.at<uchar>(r, c_flip) == 1) {
                     //printw(BOLD(FBLU(BWHT("\u25A0"))));
-                    printw("\u25A0");
+                    printw("F");
                 }
                 else if (subsampled_map.at<uchar>(r, c_flip) == 0) {
                     //printw(BWHT(" "));
