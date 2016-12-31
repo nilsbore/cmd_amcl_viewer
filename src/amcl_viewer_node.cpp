@@ -137,7 +137,7 @@ public:
         save_map(global_costmap_msg);
 
 #if WITH_NCURSES
-        //initscr();
+        initscr();
 #endif
     }
 
@@ -235,8 +235,10 @@ public:
     {
         struct winsize w;
 #if WITH_NCURSES
-        initscr();
+        //initscr();
+        refresh();
         getmaxyx(stdscr, w.ws_row, w.ws_col);
+        //ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
         //endwin();
 #else
         ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
@@ -381,6 +383,8 @@ public:
             return;
         }
 
+        clear();
+
         //vector<string> pointer_signs = { BOLD(FRED(BWHT("<"))), BOLD(FRED(BWHT("v"))), BOLD(FRED(BWHT(">"))), BOLD(FRED(BWHT("^")))};
         vector<string> pointer_signs = { BOLD(FRED(BWHT("<"))), BOLD(FRED(BWHT("v"))), BOLD(FRED(BWHT(">"))), BOLD(FRED(BWHT("^")))};
 
@@ -411,13 +415,14 @@ public:
                     printw(" ");
                 }
                 else {
-                    cout << KBLU << KKWHT << subsampled_map.at<char>(r, c_flip) << RST << RST;
+                    addch(subsampled_map.at<char>(r, c_flip));
+                    //cout << KBLU << KKWHT << subsampled_map.at<char>(r, c_flip) << RST << RST;
                 }
             }
             cout << '\n';
         }
 
-        getch();
+        refresh();
 
     }
 #endif
@@ -428,7 +433,8 @@ public:
         while (ros::ok()) {
             rate.sleep();
             ros::spinOnce();
-            draw();
+            //draw();
+            draw_ncurses();
         }
     }
 };
