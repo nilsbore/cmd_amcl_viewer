@@ -390,7 +390,7 @@ public:
 
         clear();
         start_color();
-        init_pair(1, COLOR_BLUE, COLOR_WHITE); // pointer foreground / background
+        init_pair(1, COLOR_RED, COLOR_WHITE); // pointer foreground / background
         init_pair(2, COLOR_RED, COLOR_WHITE); // goal foreground / background
         init_pair(3, COLOR_CYAN, COLOR_CYAN); // occupied foreground / background
         init_pair(4, COLOR_WHITE, COLOR_WHITE); // free foreground / background
