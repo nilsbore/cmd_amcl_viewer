@@ -1,3 +1,7 @@
+#define WITH_WAYPOINTS 1
+#define WITH_NCURSES 1
+#define WITH_NAV_GOAL 1
+
 #include <ros/ros.h>
 #include <opencv2/opencv.hpp>
 #include <nav_msgs/OccupancyGrid.h>
@@ -7,9 +11,6 @@
 //#include <algorithm>
 #include <cctype>
 #include <clocale>
-
-#define WITH_WAYPOINTS 1
-#define WITH_NCURSES 1
 
 #if WITH_WAYPOINTS
 #include <strands_navigation_msgs/TopologicalMap.h>
@@ -61,8 +62,6 @@
 #define BOLD(x) "\x1B[1m" x RST
 #define UNDL(x) "\x1B[4m" x RST
 
-#define WITH_NAV_GOAL 0
-
 using namespace std;
 
 class MapViewerNode {
@@ -90,6 +89,8 @@ public:
     int subsampled_direction;
     int subsampled_pose_x;
     int subsampled_pose_y;
+    int old_subsampled_pose_x;
+    int old_subsampled_pose_y;
     struct winsize last_w;
 
     double char_scale;
@@ -99,7 +100,12 @@ public:
     string last_goal;
     int goal_x;
     int goal_y;
+    int old_goal_x;
+    int old_goal_y;
     string goal_action;
+    int old_goal_string_size;
+
+    string pointer_signs_str;
 
     MapViewerNode()
     {
@@ -113,7 +119,11 @@ public:
         pn.param<std::string>("pose", pose_input, std::string("/robot_pose"));
 #endif
         pn.param<std::string>("map", map_input, std::string("/map"));
-        char_scale = 1.8;
+        char_scale = 2.0;
+        pointer_signs_str = string("<v>^");
+        goal_x = goal_y = -1;
+        subsampled_pose_x = subsampled_pose_y = -1;
+        old_goal_string_size = 0;
 
         pose_sub = n.subscribe(pose_input, 1, &MapViewerNode::pose_callback, this);
 
@@ -139,6 +149,13 @@ public:
 
 #if WITH_NCURSES
         initscr();
+        start_color();
+        init_pair(1, COLOR_RED, COLOR_WHITE); // pointer foreground / background
+        init_pair(2, COLOR_RED, COLOR_WHITE); // goal foreground / background
+        init_pair(3, COLOR_CYAN, COLOR_CYAN); // occupied foreground / background
+        init_pair(4, COLOR_WHITE, COLOR_WHITE); // free foreground / background
+        init_pair(5, COLOR_BLUE, COLOR_WHITE); // waypoint foreground / background
+        init_pair(6, COLOR_WHITE, COLOR_CYAN); // header foreground / background
 #endif
     }
 
@@ -298,8 +315,8 @@ public:
             return false;
         }
 
-        int old_subsampled_pose_x = subsampled_pose_x;
-        int old_subsampled_pose_y = subsampled_pose_y;
+        old_subsampled_pose_x = subsampled_pose_x;
+        old_subsampled_pose_y = subsampled_pose_y;
         int old_subsampled_direction = subsampled_direction;
 
 #if WITH_NAV_GOAL
@@ -328,8 +345,8 @@ public:
         }
 
         int direction;
-        int old_goal_x = goal_x;
-        int old_goal_y = goal_y;
+        old_goal_x = goal_x;
+        old_goal_y = goal_y;
         tie(goal_x, goal_y, direction) = pose_to_discrete_pose(iter->second);
         return (old_goal_x != goal_x ||
                 old_goal_y != goal_y);
@@ -378,76 +395,87 @@ public:
     }
 
 #if WITH_NCURSES
+    void draw_block(int r, int c)
+    {
+        int c_flip = subsampled_width-c-1;
+        move(r, c);
+        if (pose && c_flip == subsampled_pose_x && r == subsampled_pose_y) {
+            attron(COLOR_PAIR(1));
+            addch(pointer_signs_str[subsampled_direction]);
+            attroff(COLOR_PAIR(1));
+        }
+        else if (!last_goal.empty() && c_flip == goal_x && r == goal_y) {
+            attron(COLOR_PAIR(2));
+            printw("*");
+            attroff(COLOR_PAIR(2));
+        }
+        else if (subsampled_map.at<uchar>(r, c_flip) == 1) {
+            attron(COLOR_PAIR(3));
+            printw("O");
+            attroff(COLOR_PAIR(3));
+        }
+        else if (subsampled_map.at<uchar>(r, c_flip) == 0) {
+            attron(COLOR_PAIR(4));
+            printw(" ");
+            attroff(COLOR_PAIR(4));
+        }
+        else {
+            attron(COLOR_PAIR(5));
+            addch(subsampled_map.at<char>(r, c_flip));
+            attroff(COLOR_PAIR(5));
+        }
+    }
+
+    void draw_header()
+    {
+        string goal_header = last_goal + ": " + goal_action;
+        if (!last_goal.empty() && !goal_action.empty() && goal_header.size() < subsampled_width) {
+            move(0, 0);
+            attron(COLOR_PAIR(6));
+            printw(goal_header.c_str());
+            attroff(COLOR_PAIR(6));
+            for (int c = goal_header.size(); c < min(old_goal_string_size, subsampled_width); ++c) {
+                draw_block(0, c);
+            }
+            old_goal_string_size = goal_header.size();
+        }
+    }
+
     void draw_ncurses()
     {
         bool did_update = maybe_subsample_map();
         bool did_move = subsample_pose();
         bool did_update_goal = subsample_goal();
 
-        if (!did_update && !did_move && !did_update_goal) {
+        if (!did_update) {
+            if (did_move) {
+                draw_block(subsampled_pose_y, subsampled_width-subsampled_pose_x-1);
+                if (old_subsampled_pose_x != -1 && old_subsampled_pose_y != -1) {
+                    draw_block(old_subsampled_pose_y, subsampled_width-old_subsampled_pose_x-1);
+                }
+                refresh();
+            }
+            if (did_update_goal) {
+                draw_block(goal_y, subsampled_width-goal_x-1);
+                if (old_goal_x != -1 && old_goal_y != -1) {
+                    draw_block(old_goal_y, subsampled_width-old_goal_x-1);
+                }
+                draw_header();
+                refresh();
+            }
+
             return;
         }
 
         clear();
-        start_color();
-        init_pair(1, COLOR_RED, COLOR_WHITE); // pointer foreground / background
-        init_pair(2, COLOR_RED, COLOR_WHITE); // goal foreground / background
-        init_pair(3, COLOR_CYAN, COLOR_CYAN); // occupied foreground / background
-        init_pair(4, COLOR_WHITE, COLOR_WHITE); // free foreground / background
-        init_pair(5, COLOR_BLUE, COLOR_WHITE); // waypoint foreground / background
-        init_pair(6, COLOR_WHITE, COLOR_CYAN); // header foreground / background
 
-        //vector<string> pointer_signs = { BOLD(FRED(BWHT("<"))), BOLD(FRED(BWHT("v"))), BOLD(FRED(BWHT(">"))), BOLD(FRED(BWHT("^")))};
-        vector<string> pointer_signs = { "<", "v", ">", "^"};
-
-        cout << endl;
-        int start_pos = 0;
-        if (!last_goal.empty() && !goal_action.empty() && last_goal.size() + goal_action.size() + 2 < subsampled_width) {
-            //cout << KBLU << KKWHT << last_goal << ": " << goal_action << RST << RST;
-            move(0, 0);
-            string goal_header = last_goal + ": " + goal_action;
-            attron(COLOR_PAIR(6));
-            printw(goal_header.c_str());
-            attroff(COLOR_PAIR(6));
-            start_pos += goal_header.size();
-        }
         for (int r = 0; r < subsampled_height; ++r) {
-            for (int c = r == 0 ? start_pos : 0; c < subsampled_width; ++c) {
-                int c_flip = subsampled_width-c-1;
-                move(r, c);
-                if (pose && c_flip == subsampled_pose_x && r == subsampled_pose_y) {
-                    //cout << pointer_signs[subsampled_direction];
-                    attron(COLOR_PAIR(1));
-                    printw(pointer_signs[subsampled_direction].c_str());
-                    attroff(COLOR_PAIR(1));
-                }
-                else if (!last_goal.empty() && c_flip == goal_x && r == goal_y) {
-                    //printw(BOLD(FRED(BWHT("*"))));
-                    attron(COLOR_PAIR(2));
-                    printw("*");
-                    attroff(COLOR_PAIR(2));
-                }
-                else if (subsampled_map.at<uchar>(r, c_flip) == 1) {
-                    //printw(BOLD(FBLU(BWHT("\u25A0"))));
-                    attron(COLOR_PAIR(3));
-                    printw("F");
-                    attroff(COLOR_PAIR(3));
-                }
-                else if (subsampled_map.at<uchar>(r, c_flip) == 0) {
-                    //printw(BWHT(" "));
-                    attron(COLOR_PAIR(4));
-                    printw(" ");
-                    attroff(COLOR_PAIR(4));
-                }
-                else {
-                    attron(COLOR_PAIR(5));
-                    addch(subsampled_map.at<char>(r, c_flip));
-                    attroff(COLOR_PAIR(5));
-                    //cout << KBLU << KKWHT << subsampled_map.at<char>(r, c_flip) << RST << RST;
-                }
+            for (int c = 0; c < subsampled_width; ++c) {
+                draw_block(r, c);
             }
-            cout << '\n';
         }
+        old_goal_string_size = 0;
+        draw_header();
 
         refresh();
 
