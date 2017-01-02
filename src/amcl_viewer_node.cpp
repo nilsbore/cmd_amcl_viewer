@@ -183,7 +183,7 @@ public:
 
     void exec_callback(const strands_executive_msgs::TaskEvent::ConstPtr& exec_msg)
     {
-        if (exec_msg->event == strands_executive_msgs::TaskEvent::NAVIGATION_STARTED) {
+        if (exec_msg->event == strands_executive_msgs::TaskEvent::TASK_STARTED) {
             last_goal = exec_msg->task.start_node_id;
             goal_action = exec_msg->task.action;
         }
