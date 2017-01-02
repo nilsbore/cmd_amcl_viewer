@@ -1,6 +1,6 @@
 #define WITH_WAYPOINTS 1
 #define WITH_NCURSES 1
-#define WITH_NAV_GOAL 1
+#define WITH_NAV_GOAL 0
 
 #include <ros/ros.h>
 #include <opencv2/opencv.hpp>
