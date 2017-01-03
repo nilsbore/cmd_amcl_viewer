@@ -81,8 +81,10 @@ public:
 
 #if WITH_BATTERY
     ros::Subscriber battery_sub;
-    int subsampled_battery;
 #endif
+    int battery;
+    int subsampled_battery;
+    int battery_levels;
 
 #if WITH_NAV_GOAL
     geometry_msgs::PoseStampedConstPtr pose;
@@ -157,8 +159,9 @@ public:
 
 #if WITH_BATTERY
         battery_sub = n.subscribe("/battery_state", 1, &MapViewerNode::battery_callback, this);
-        subsampled_battery = -1;
 #endif
+        subsampled_battery = battery = -1;
+        battery_levels = 25;
 
         save_map(global_costmap_msg);
 
@@ -172,6 +175,7 @@ public:
         init_pair(4, COLOR_WHITE, COLOR_WHITE); // free foreground / background
         init_pair(5, COLOR_BLUE, COLOR_WHITE); // waypoint foreground / background
         init_pair(6, COLOR_WHITE, COLOR_CYAN); // header foreground / background
+        init_pair(7, COLOR_CYAN, COLOR_GREEN); // battery foreground / background
 #endif
     }
 
@@ -192,11 +196,20 @@ public:
     }
 
 #if WITH_BATTERY
-    void battery_callback(const scitos_msgs::BatteryStateConstPtr& pose_msg)
+    void battery_callback(const scitos_msgs::BatteryStateConstPtr& battery_msg)
     {
-        subsampled_battery = int(double(pose_msg->lifePercent) / 100.0 * 6.0);
+        battery = int(double(battery_msg->lifePercent) / 100.0 * double(battery_levels));
     }
 #endif
+
+    bool subsample_battery()
+    {
+        if (battery != subsampled_battery) {
+            subsampled_battery = battery;
+            return true;
+        }
+        return false;
+    }
 
 #if WITH_WAYPOINTS
     void route_callback(const strands_navigation_msgs::TopologicalRouteConstPtr& route_msg)
@@ -467,11 +480,32 @@ public:
         }
     }
 
+    void draw_battery()
+    {
+        if (subsampled_battery == -1 || battery_levels > subsampled_width) {
+            return;
+        }
+        //attron(A_BOLD);
+        attron(COLOR_PAIR(7));
+        move(0, subsampled_width-battery_levels);
+        for (int c_flip = 0; c_flip < battery_levels; ++c_flip) {
+            if (subsampled_battery > c_flip) {
+                addch(' ');
+            }
+            else {
+                addch(ACS_CKBOARD);
+            }
+        }
+        attroff(COLOR_PAIR(7));
+        //attroff(A_BOLD);
+    }
+
     void draw_ncurses()
     {
         bool did_update = maybe_subsample_map();
         bool did_move = subsample_pose();
         bool did_update_goal = subsample_goal();
+        bool did_update_battery = subsample_battery();
 
         if (!did_update) {
             if (did_move) {
@@ -490,6 +524,10 @@ public:
                 draw_header();
                 refresh();
             }
+            if (did_update_battery) {
+                draw_battery();
+                refresh();
+            }
 
             return;
         }
@@ -503,6 +541,7 @@ public:
         }
         old_goal_string_size = 0;
         draw_header();
+        draw_battery();
 
         refresh();
 
