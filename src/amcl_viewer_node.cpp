@@ -165,6 +165,7 @@ public:
 #if WITH_NCURSES
         initscr();
         start_color();
+        curs_set(0);
         init_pair(1, COLOR_RED, COLOR_WHITE); // pointer foreground / background
         init_pair(2, COLOR_RED, COLOR_WHITE); // goal foreground / background
         init_pair(3, COLOR_CYAN, COLOR_CYAN); // occupied foreground / background
@@ -462,7 +463,7 @@ public:
                 draw_block(0, c);
             }
             old_goal_string_size = goal_header.size();
-            move(subsampled_height-1, subsampled_width-1);
+            //move(subsampled_height-1, subsampled_width-1);
         }
     }
 
@@ -478,7 +479,7 @@ public:
                 if (old_subsampled_pose_x != -1 && old_subsampled_pose_y != -1) {
                     draw_block(old_subsampled_pose_y, subsampled_width-old_subsampled_pose_x-1);
                 }
-                move(subsampled_height-1, subsampled_width-1);
+                //move(subsampled_height-1, subsampled_width-1);
                 refresh();
             }
             if (did_update_goal) {
