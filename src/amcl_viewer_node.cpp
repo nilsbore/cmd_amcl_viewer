@@ -1,6 +1,7 @@
 #define WITH_WAYPOINTS 1
 #define WITH_NCURSES 1
 #define WITH_NAV_GOAL 0
+#define WITH_BATTERY 1
 
 #include <ros/ros.h>
 #include <opencv2/opencv.hpp>
@@ -20,6 +21,10 @@
 
 #if WITH_NCURSES
 #include <ncurses.h>
+#endif
+
+#if WITH_BATTERY
+#include <scitos_msgs/BatteryState.h>
 #endif
 
 /* FOREGROUND */
@@ -72,6 +77,11 @@ public:
 #if WITH_WAYPOINTS
     ros::Subscriber route_sub;
     ros::Subscriber exec_sub;
+#endif
+
+#if WITH_BATTERY
+    ros::Subscriber battery_sub;
+    int subsampled_battery;
 #endif
 
 #if WITH_NAV_GOAL
@@ -145,6 +155,11 @@ public:
         }
 #endif
 
+#if WITH_BATTERY
+        battery_sub = n.subscribe("/battery_state", 1, &MapViewerNode::battery_callback, this);
+        subsampled_battery = -1;
+#endif
+
         save_map(global_costmap_msg);
 
 #if WITH_NCURSES
@@ -174,6 +189,13 @@ public:
     {
         pose = pose_msg;
     }
+
+#if WITH_BATTERY
+    void battery_callback(const scitos_msgs::BatteryStateConstPtr& pose_msg)
+    {
+        subsampled_battery = int(double(pose_msg->lifePercent) / 100.0 * 6.0);
+    }
+#endif
 
 #if WITH_WAYPOINTS
     void route_callback(const strands_navigation_msgs::TopologicalRouteConstPtr& route_msg)
