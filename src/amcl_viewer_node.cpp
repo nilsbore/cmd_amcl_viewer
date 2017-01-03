@@ -395,10 +395,12 @@ public:
     }
 
 #if WITH_NCURSES
-    void draw_block(int r, int c)
+    void draw_block(int r, int c, bool do_move=true)
     {
         int c_flip = subsampled_width-c-1;
-        move(r, c);
+        if (do_move) {
+            move(r, c);
+        }
         if (pose && c_flip == subsampled_pose_x && r == subsampled_pose_y) {
             attron(COLOR_PAIR(1));
             addch(pointer_signs_str[subsampled_direction]);
@@ -473,7 +475,7 @@ public:
 
         for (int r = 0; r < subsampled_height; ++r) {
             for (int c = 0; c < subsampled_width; ++c) {
-                draw_block(r, c);
+                draw_block(r, c, c == 0);
             }
         }
         old_goal_string_size = 0;
